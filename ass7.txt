@@ -1,0 +1,101 @@
+CREATE TABLE library (
+    B_id INT PRIMARY KEY,
+    Title VARCHAR(50),
+    Authors VARCHAR(50),
+    Edition INT,
+    no_of_c INT
+);
+
+CREATE TABLE lib_audit (
+    B_id INT,
+    Title VARCHAR(50),
+    Authors VARCHAR(50),
+    Edition INT,
+    no_of_c INT,
+    date_of_mod DATE,
+    type_of_op VARCHAR(15),
+    username VARCHAR(50)
+);
+
+CREATE TABLE transaction_table (
+    Trans_id INT PRIMARY KEY,
+    B_id INT,
+    I_R CHAR(1),         
+    no_of_c INT
+);
+
+INSERT INTO library VALUES
+(1, 'TOC', 'V.v Richard', 2, 4),
+(2, 'CN', 'Forouzan', 4, 5),
+(3, 'ISEE', 'Rahul De', 3, 5),
+(4, 'DBMS', 'Silberschatz', 3, 2),
+(5, 'SEPM', 'Pressman', 5, 6);
+
+DELIMITER $$
+
+CREATE TRIGGER trg_library_update
+AFTER UPDATE ON library
+FOR EACH ROW
+BEGIN
+    INSERT INTO lib_audit
+    VALUES (OLD.B_id, OLD.Title, OLD.Authors, OLD.Edition, OLD.no_of_c,
+            CURDATE(), 'updated', CURRENT_USER());
+END $$
+
+CREATE TRIGGER trg_library_delete
+AFTER DELETE ON library
+FOR EACH ROW
+BEGIN
+    INSERT INTO lib_audit
+    VALUES (OLD.B_id, OLD.Title, OLD.Authors, OLD.Edition, OLD.no_of_c,
+            CURDATE(), 'deleted', CURRENT_USER());
+END $$
+
+CREATE TRIGGER trg_before_issue
+BEFORE INSERT ON transaction_table
+FOR EACH ROW
+BEGIN
+    DECLARE stock INT;
+    
+    IF NEW.I_R = 'I' THEN
+        SELECT no_of_c INTO stock
+        FROM library
+        WHERE B_id = NEW.B_id;
+
+        IF NEW.no_of_c > stock THEN
+            SET NEW.no_of_c = stock;
+        END IF;
+    END IF;
+END $$
+
+CREATE TRIGGER trg_after_transaction
+AFTER INSERT ON transaction_table
+FOR EACH ROW
+BEGIN
+    IF NEW.I_R = 'I' THEN
+        UPDATE library
+        SET no_of_c = no_of_c - NEW.no_of_c
+        WHERE B_id = NEW.B_id;
+    ELSE
+        UPDATE library
+        SET no_of_c = no_of_c + NEW.no_of_c
+        WHERE B_id = NEW.B_id;
+    END IF;
+END $$
+
+DELIMITER ;
+
+-- Test updates and deletes
+UPDATE library SET Authors = 'Kapil-Mishra' WHERE B_id = 1;
+DELETE FROM library WHERE B_id = 3;
+
+-- Test issuing books
+INSERT INTO transaction_table VALUES (10, 2, 'I', 7);
+INSERT INTO transaction_table VALUES (14, 5, 'I', 3);
+
+-- Test returning books
+INSERT INTO transaction_table VALUES (12, 2, 'R', 3);
+
+SELECT * FROM library;
+SELECT * FROM lib_audit;
+SELECT * FROM transaction_table;

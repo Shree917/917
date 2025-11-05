@@ -1,0 +1,91 @@
+------------------------------------------------------------
+-- PROBLEM 1: Update marks using implicit cursor attributes
+------------------------------------------------------------
+
+-- Create table
+CREATE TABLE student(
+    roll_no INT,
+    name VARCHAR(20),
+    marks INT
+);
+
+-- Insert values
+INSERT INTO student VALUES(1,'abc',39);
+INSERT INTO student VALUES(2,'pqr',35);
+INSERT INTO student VALUES(3,'xyz',41);
+INSERT INTO student VALUES(4,'cde',37);
+INSERT INTO student VALUES(5,'lmo',46);
+
+-- Display table rows
+SELECT * FROM student;
+
+-- Enable output
+SET SERVEROUTPUT ON;
+
+-- Anonymous Block using implicit cursor
+BEGIN
+    UPDATE student
+    SET marks = 40
+    WHERE marks BETWEEN 35 AND 39;
+
+    IF SQL%NOTFOUND THEN
+        DBMS_OUTPUT.PUT_LINE('No records were updated');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Total records updated: '||SQL%ROWCOUNT);
+    END IF;
+END;
+/
+
+-- Display updated data
+SELECT * FROM student;
+
+------------------------------------------------------------
+-- PROBLEM 2: Copy to new table using explicit + parametrized cursor
+------------------------------------------------------------
+
+-- Create new table
+CREATE TABLE newstudent(
+    roll_no INT,
+    name VARCHAR(20),
+    marks INT
+);
+
+-- Insert values in newstudent table
+INSERT INTO newstudent VALUES(1,'abc',45);
+INSERT INTO newstudent VALUES(3,'xyz',45);
+INSERT INTO newstudent VALUES(7,'xyzr',95);
+INSERT INTO newstudent VALUES(8,'pqrs',65);
+
+-- Display newstudent data before copy
+SELECT * FROM newstudent;
+
+-- Anonymous Block using explicit & parameterized cursor
+DECLARE
+    -- Cursor to fetch all student records
+    CURSOR cur_s IS
+        SELECT * FROM student;
+
+    -- Parameterized cursor to check if student exists in new table
+    CURSOR cur_new(a INT) IS
+        SELECT * FROM newstudent WHERE roll_no = a;
+
+    -- Row variable for newstudent table
+    nrec newstudent%ROWTYPE;
+BEGIN
+    FOR srec IN cur_s    -- Loop through student table
+    LOOP
+        OPEN cur_new(srec.roll_no);
+        FETCH cur_new INTO nrec;
+
+        -- If no matching roll_no found, insert record
+        IF cur_new%NOTFOUND THEN
+            INSERT INTO newstudent VALUES(srec.roll_no, srec.name, srec.marks);
+        END IF;
+
+        CLOSE cur_new;
+    END LOOP;
+END;
+/
+
+-- Display final newstudent table
+SELECT * FROM newstudent;

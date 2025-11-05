@@ -1,0 +1,191 @@
+-- ===== Clean start (optional, only if rerunning) =====
+DROP VIEW IF EXISTS new1;
+DROP VIEW IF EXISTS newview2;
+DROP VIEW IF EXISTS newview1;
+DROP VIEW IF EXISTS inst_view;
+
+DROP TABLE IF EXISTS Student;
+DROP TABLE IF EXISTS teachers;
+DROP TABLE IF EXISTS coursetable;
+DROP TABLE IF EXISTS course;
+-- Drop FK first if it exists before dropping Department
+ALTER TABLE instructor DROP FOREIGN KEY instructor_ibfk_1; -- will fail harmlessly if not present
+DROP TABLE IF EXISTS instructor;
+DROP TABLE IF EXISTS Department;
+
+
+-- ===== 1. Department with UNIQUE dept_name =====
+CREATE TABLE Department(
+    dept_no   INT,
+    dept_name VARCHAR(15),
+    bldg_name VARCHAR(15),
+    UNIQUE(dept_name)
+);
+
+-- Seed departments so later selects show rows
+INSERT INTO Department (dept_no, dept_name, bldg_name) VALUES
+(1,'comp','A'),
+(2,'mech','B'),
+(3,'IT','C');
+
+-- ===== 2. Instructor with NOT NULL name and PK =====
+CREATE TABLE instructor(
+    ins_id   INT,
+    ins_name VARCHAR(15) NOT NULL,
+    dept_no  INT,
+    salary   INT,
+    mob_no   INT,
+    PRIMARY KEY(ins_id)
+);
+
+-- Seed instructors to match your outputs
+INSERT INTO instructor VALUES
+(1,'A',1,10000,10020),
+(2,'B',2,12000,11220),
+(3,'C',3,10500,11020);
+
+-- ===== 3. Course with PK =====
+CREATE TABLE course(
+    course_id INT,
+    title     VARCHAR(15),
+    dept_no   INT,
+    credits   INT,
+    PRIMARY KEY(course_id)
+);
+
+-- (Optional seed courses; not required for your shown outputs)
+-- INSERT INTO course VALUES (101,'DBMS',1,4),(102,'Thermo',2,4),(103,'Networks',3,4);
+
+-- ===== 4. Teachers with FKs to instructor & course =====
+CREATE TABLE teachers(
+    teacher_id INT,
+    course_id  INT,
+    semester   INT,
+    year       YEAR,
+    FOREIGN KEY (teacher_id) REFERENCES instructor(ins_id),
+    FOREIGN KEY (course_id)  REFERENCES course(course_id)
+);
+
+-- (Optional seed: one teaching row; using semester=2 as in your output)
+-- If you didn’t seed 'course', create a dummy course to satisfy FK:
+INSERT INTO course VALUES (201,'OS',1,4);
+INSERT INTO teachers VALUES (1,201,2,2024);
+
+
+-- ===== Queries / Operations =====
+
+-- 1) Add PK in Department
+ALTER TABLE Department ADD PRIMARY KEY(dept_no);
+
+-- 2) Add FK in instructor(dept_no) → Department(dept_no)
+ALTER TABLE instructor
+    ADD FOREIGN KEY(dept_no) REFERENCES Department(dept_no);
+
+-- 3) Add column budget to Department
+ALTER TABLE Department ADD COLUMN budget INT;
+
+-- (Your later outputs show rows with NULL budgets; we leave as NULL)
+-- Show data (for verification when you run):
+-- SELECT * FROM Department;
+
+-- 4) Create UNIQUE index on mobile number of instructor
+CREATE UNIQUE INDEX sr ON instructor(mob_no);
+
+-- 5) Create view (instructor without salary)
+CREATE VIEW inst_view AS
+SELECT ins_id, ins_name, dept_no, mob_no
+FROM instructor;
+
+-- 6) Insert a new department row and insert instructor via the view
+INSERT INTO Department VALUES (4,'Elect','D',NULL);
+
+-- Show inst_view before insert:
+-- SELECT * FROM inst_view;
+
+INSERT INTO inst_view VALUES (4,'D',4,12000);
+
+-- 7) Update instructor’s department via the view
+UPDATE inst_view SET dept_no = 2 WHERE ins_id = 4;
+
+-- 8) Delete instructor via the view
+DELETE FROM inst_view WHERE ins_id = 4;
+
+-- 9) Drop the view
+DROP VIEW inst_view;
+
+-- 10) Remove the Budget column
+ALTER TABLE Department DROP COLUMN budget;
+
+-- 11) Increase size of course.title
+ALTER TABLE course MODIFY title VARCHAR(20);
+
+-- 12) View: instructor name, department name, salary
+CREATE VIEW newview1 AS
+SELECT i.ins_name, d.dept_name, i.salary
+FROM instructor i
+JOIN Department d ON i.dept_no = d.dept_no;
+
+-- 13) Update salary via view
+UPDATE newview1 SET salary = 11000 WHERE ins_name = 'C';
+
+-- 14) Delete the unique index from instructor
+ALTER TABLE instructor DROP INDEX sr;
+
+-- 15) Rename course to coursetable
+RENAME TABLE course TO coursetable;
+
+-- 16) View: instructor name and course title (by department)
+CREATE VIEW newview2 AS
+SELECT i.ins_name, c.title
+FROM instructor i
+JOIN coursetable c ON i.dept_no = c.dept_no;
+
+-- (Likely empty unless you add courses per dept_no)
+-- SELECT * FROM newview2;  -- Expect empty set with current seed
+
+
+-- 17) Drop Department PK (must drop referencing FK first)
+-- Show Create helped you discover the name 'instructor_ibfk_1'
+ALTER TABLE instructor DROP FOREIGN KEY instructor_ibfk_1;
+ALTER TABLE Department DROP PRIMARY KEY;
+
+-- (Department now has no PK; we’ll add it back before creating Student)
+
+
+-- 18) Create Student with AUTO_INCREMENT and FK to Department
+ALTER TABLE Department ADD PRIMARY KEY(dept_no);
+
+CREATE TABLE Student(
+    stud_id   INT AUTO_INCREMENT,
+    stud_name VARCHAR(10),
+    dept_no   INT,
+    DOB       DATE,
+    FOREIGN KEY(dept_no) REFERENCES Department(dept_no),
+    PRIMARY KEY(stud_id)
+);
+
+-- Seed students (to match your sample)
+INSERT INTO Student (stud_name, dept_no, DOB) VALUES
+('AB',1,'1997-04-12'),
+('CD',3,'1996-06-12'),
+('EF',2,'1998-09-25');
+
+-- 19) Change AUTO_INCREMENT sequence
+ALTER TABLE Student AUTO_INCREMENT = 5;
+
+-- You later show a row with stud_id = 10 named GH.
+-- To reproduce that exact output, insert GH with id 10:
+INSERT INTO Student (stud_id, stud_name, dept_no, DOB) VALUES
+(10, 'GH', 2, '1995-09-25');
+
+-- 20) View: computer department teachers who teach in 5th semester
+-- Your output uses semester=2; keeping that for fidelity.
+CREATE VIEW new1 AS
+SELECT d.dept_name, t.semester, i.ins_name
+FROM Department d
+JOIN instructor i ON i.dept_no = d.dept_no
+JOIN teachers  t ON t.teacher_id = i.ins_id
+WHERE t.semester = 2
+  AND d.dept_name = 'comp';
+
+-- If you truly want 5th semester, change t.semester = 5 above.

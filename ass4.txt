@@ -1,0 +1,77 @@
+-- Create Borrower Table
+CREATE TABLE borrower_t7(
+    roll_no      NUMBER       NOT NULL,
+    name         VARCHAR2(20),
+    date_of_i    DATE,
+    name_of_book VARCHAR2(30),
+    status       VARCHAR2(1) CHECK (status IN ('i','r'))
+);
+
+-- Create Fine Table
+CREATE TABLE fine_t7(
+    roll_no   NUMBER,
+    date_of_r DATE,
+    amt       NUMBER
+);
+
+-- Insert Records
+INSERT INTO borrower_t7 VALUES(1,'Harsh',   TO_DATE('12-06-2017','DD-MM-YYYY'),'Harry Potter','i');
+INSERT INTO borrower_t7 VALUES(2,'Sandesh', TO_DATE('15-06-2017','DD-MM-YYYY'),'IceAge','r');
+INSERT INTO borrower_t7 VALUES(3,'Rahul',   TO_DATE('25-07-2017','DD-MM-YYYY'),'Pokemon','i');
+INSERT INTO borrower_t7 VALUES(4,'Sarvesh', TO_DATE('20-04-2017','DD-MM-YYYY'),'Duel','r');
+INSERT INTO borrower_t7 VALUES(5,'Ishwari', TO_DATE('22-05-2017','DD-MM-YYYY'),'HindiKatha','i');
+
+COMMIT;
+
+-- PL/SQL Block for Fine Calculation
+DECLARE
+    roll      NUMBER := &roll_number;
+    b_name    VARCHAR2(30) := '&bookname';
+    mdays     NUMBER := 0;
+    issue_dt  DATE;
+    fine_amt  NUMBER := 0;
+BEGIN
+    -- Fetch Issue Date
+    SELECT date_of_i 
+    INTO issue_dt
+    FROM borrower_t7
+    WHERE roll_no = roll
+      AND name_of_book = b_name
+      AND status = 'i';
+
+    -- Calculate total days
+    mdays := SYSDATE - issue_dt;
+
+    -- Calculate Fine
+    IF mdays >= 15 AND mdays < 30 THEN
+        fine_amt := (mdays - 15) * 5;
+    ELSIF mdays >= 30 THEN
+        fine_amt := (15 * 5) + (mdays - 30) * 50;
+    END IF;
+
+    -- Update status (returned)
+    UPDATE borrower_t7
+    SET status = 'r'
+    WHERE roll_no = roll
+      AND name_of_book = b_name;
+
+    -- Insert Fine
+    IF fine_amt > 0 THEN
+        INSERT INTO fine_t7 VALUES(roll, SYSDATE, fine_amt);
+    END IF;
+
+    DBMS_OUTPUT.PUT_LINE('Book Returned Successfully.');
+    DBMS_OUTPUT.PUT_LINE('Fine Amount = ' || fine_amt);
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('No issued book found for given input.');
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Unexpected Error Occurred.');
+END;
+/
+-- View Tables
+SELECT * FROM borrower_t7;
+SELECT * FROM fine_t7;
+
+COMMIT;
